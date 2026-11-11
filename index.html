@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flashcards de notas musicales</title>
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  --bgc: #1e6fe0;
+  --ink: #17171c;
+  --panel: #17171c;
+  --panel-ink: #ffffff;
+  --card: #ffffff;
+  --yellow: #ffd23f;
+  --green: #2bd36b;
+  --orange: #ffb020;
+  --muted: #55555e;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background-color: var(--bgc);
+  background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,.24) 0 7px, transparent 8px);
+  background-size: 38px 38px;
+  transition: background-color .5s;
+  color: var(--ink);
+  font-family: "Arial Rounded MT Bold", "Trebuchet MS", Verdana, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 18px 14px 32px;
+}
+button { font: inherit; color: var(--ink); cursor: pointer; }
+button:focus-visible { outline: 4px solid #fff; outline-offset: 3px; }
+
+.header {
+  background: var(--panel); color: var(--panel-ink);
+  border-radius: 14px; padding: 12px 18px; text-align: center;
+  box-shadow: 0 6px 0 rgba(0,0,0,.35); max-width: 340px; margin-bottom: 16px;
+}
+.header h1 { font-size: 1.15rem; margin: 0 0 4px; }
+.header p { margin: 0; font-size: .95rem; line-height: 1.35; color: var(--yellow); }
+
+.seg { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; justify-content: center; }
+.seg button {
+  background: #fff; border: 3px solid var(--ink); border-radius: 12px;
+  padding: 8px 14px; font-size: .9rem; box-shadow: 0 4px 0 rgba(0,0,0,.35);
+}
+.seg button[aria-pressed="true"] { background: var(--yellow); transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+
+.stats {
+  background: var(--panel); color: var(--panel-ink); border-radius: 999px;
+  padding: 6px 16px; font-size: .95rem; margin: 6px 0 14px;
+}
+.bar { width: min(300px, 86vw); height: 14px; background: rgba(0,0,0,.35); border-radius: 8px; margin-bottom: 14px; overflow: hidden; border: 2px solid var(--ink); }
+.bar > i { display: block; height: 100%; background: var(--yellow); width: 0; transition: width .4s; }
+
+.cheer {
+  background: var(--yellow); border: 3px solid var(--ink); border-radius: 12px;
+  padding: 6px 16px; margin-bottom: 10px; font-size: 1.1rem; box-shadow: 0 4px 0 rgba(0,0,0,.35);
+}
+
+.scene { width: min(300px, 86vw); aspect-ratio: 3 / 4; perspective: 1200px; }
+.card {
+  position: relative; width: 100%; height: 100%;
+  transform-style: preserve-3d; transition: transform .45s cubic-bezier(.3,.7,.2,1);
+  cursor: pointer; border: 0; background: none; padding: 0;
+}
+.card.flipped { transform: rotateY(180deg); }
+.face {
+  position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background: var(--card); border: 5px solid var(--ink); border-radius: 18px;
+  box-shadow: 7px 7px 0 rgba(0,0,0,.4);
+  display: flex; flex-direction: column; align-items: center; padding: 16px 14px 14px;
+}
+.face.back { transform: rotateY(180deg); }
+.title { font-size: 1.05rem; background: var(--accent, var(--yellow)); border: 3px solid var(--ink); border-radius: 10px; padding: 3px 14px; }
+.face svg { width: 100%; flex: 1; min-height: 0; color: var(--ink); margin-top: 6px; }
+.slot {
+  width: 100%; height: 22%; border: 4px solid var(--ink); border-radius: 12px; background: #fff3b0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.slot.empty { background: #fff; border-style: dashed; color: var(--muted); font-size: .95rem; }
+.slot .es { font-size: 2rem; line-height: 1; }
+.slot .en { font-size: 1.1rem; }
+.piano { font-size: .75rem; color: var(--muted); margin-top: 8px; min-height: 1em; }
+
+.actions { display: flex; gap: 12px; margin-top: 20px; min-height: 54px; flex-wrap: wrap; justify-content: center; }
+.actions button {
+  border: 3px solid var(--ink); border-radius: 14px; padding: 12px 20px; font-size: 1rem;
+  box-shadow: 0 5px 0 rgba(0,0,0,.4);
+}
+.actions button:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.actions .ok { background: var(--green); }
+.actions .redo { background: var(--orange); }
+.actions .plain { background: #fff; }
+.nav { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+.nav button { background: #fff; border: 3px solid var(--ink); border-radius: 10px; padding: 7px 14px; font-size: .85rem; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.done { text-align: center; max-width: 320px; background: #fff; border: 5px solid var(--ink); border-radius: 18px; padding: 22px 18px; box-shadow: 7px 7px 0 rgba(0,0,0,.4); }
+.done h2 { margin: 0 0 6px; font-size: 1.5rem; }
+.done p { margin: 0; color: var(--muted); }
+.hint { background: var(--panel); color: var(--panel-ink); border-radius: 10px; padding: 6px 12px; font-size: .78rem; margin-top: 18px; text-align: center; max-width: 320px; }
+.scene.pop { animation: pop .7s ease; }
+@keyframes pop {
+  0% { transform: scale(1) rotate(0); }
+  25% { transform: scale(1.12) rotate(-4deg); }
+  50% { transform: scale(.96) rotate(3deg); }
+  75% { transform: scale(1.06) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.bit { position: fixed; width: 13px; height: 13px; border: 2px solid var(--ink); z-index: 50; pointer-events: none;
+  animation: fly .95s cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes fly {
+  0% { transform: translate(0,0) rotate(0) scale(1); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 140px)) rotate(var(--rot)) scale(.6); opacity: 0; }
+}
+.bigstar { position: fixed; font-size: 64px; z-index: 51; pointer-events: none; transform: translate(-50%,-50%);
+  animation: rise .85s ease-out forwards; }
+@keyframes rise {
+  0% { transform: translate(-50%,-50%) scale(.3); opacity: 0; }
+  30% { opacity: 1; transform: translate(-50%,-80%) scale(1.3); }
+  100% { transform: translate(-50%,-230%) scale(1); opacity: 0; }
+}
+.cheer { animation: cheerin .35s ease; }
+@keyframes cheerin { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.langbar { margin-bottom: 10px; }
+@media (prefers-reduced-motion: reduce) { .card, .bar > i, body { transition: none; } .scene.pop, .cheer { animation: none; } }
+</style>
+</head>
+<body>
+
+<div class="seg langbar" role="group" aria-label="Language">
+  <button data-lang="es" aria-pressed="true">Español</button>
+  <button data-lang="en" aria-pressed="false">English</button>
+</div>
+
+<div class="header">
+  <h1 data-i18n="h1"></h1>
+  <p data-i18n="welcome"></p>
+</div>
+
+<div class="seg" role="group" aria-label="Level">
+  <button data-level="inicial" aria-pressed="true" data-i18n="l1"></button>
+  <button data-level="avanzado" aria-pressed="false" data-i18n="l2"></button>
+</div>
+<div class="seg" role="group" aria-label="Clef">
+  <button data-clef="sol" aria-pressed="true" data-i18n="sol"></button>
+  <button data-clef="fa" aria-pressed="false" data-i18n="fa"></button>
+  <button data-clef="ambas" aria-pressed="false" data-i18n="both"></button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="bar" aria-hidden="true"><i id="fill"></i></div>
+<div id="stage"></div>
+<div class="hint" data-i18n="hint"></div>
+
+<script>
+
+const I18N = {
+  es: {
+    h1: "Flashcards de notas musicales",
+    welcome: "Bienvenido Rafael, estoy aquí para llevarte al siguiente nivel",
+    l1: "Nivel 1: Inicial", l2: "Nivel 2: Avanzado",
+    sol: "Clave de Sol", fa: "Clave de Fa", both: "Ambas",
+    hint: "Toca la tarjeta para voltearla. Flechas del teclado para moverte.",
+    stats: (a, b) => `⭐ ${a} de ${b} notas`,
+    titleSol: "CLAVE DE SOL", titleFa: "CLAVE DE FA",
+    ask: "¿Qué nota es? 🤔", piano: "Piano",
+    redo: "Repasar", ok: "¡La sabía!", prev: "Anterior", next: "Siguiente", shuf: "Mezclar",
+    flip: "Voltear tarjeta", staffAlt: "Nota en el pentagrama",
+    doneTitle: "🏆 ¡Nivel completado!", doneText: n => `Reconociste las ${n} notas.`,
+    goL2: "Ir al Nivel 2", again: "Jugar otra vez",
+    cheers: ["¡Genial!", "¡Súper!", "¡Excelente!", "¡Crack!", "¡Muy bien!", "¡Nivel up!"]
+  },
+  en: {
+    h1: "Music note flashcards",
+    welcome: "Welcome Rafael, I\u2019m here to take you to the next level",
+    l1: "Level 1: Beginner", l2: "Level 2: Advanced",
+    sol: "Treble clef", fa: "Bass clef", both: "Both",
+    hint: "Tap the card to flip it. Use the arrow keys to move.",
+    stats: (a, b) => `⭐ ${a} of ${b} notes`,
+    titleSol: "TREBLE CLEF", titleFa: "BASS CLEF",
+    ask: "What note is it? 🤔", piano: "Piano",
+    redo: "Review", ok: "I knew it!", prev: "Previous", next: "Next", shuf: "Shuffle",
+    flip: "Flip card", staffAlt: "Note on the staff",
+    doneTitle: "🏆 Level complete!", doneText: n => `You recognized all ${n} notes.`,
+    goL2: "Go to Level 2", again: "Play again",
+    cheers: ["Awesome!", "Super!", "Excellent!", "Nailed it!", "Great job!", "Level up!"]
+  }
+};
+let lang = "es";
+try { const l = localStorage.getItem("notas-lang"); if (l === "en" || l === "es") lang = l; } catch (e) {}
+const T = () => I18N[lang];
+const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const NAMES_ES = ["DO","RE","MI","FA","SOL","LA","SI"];
+const LETTERS = ["C","D","E","F","G","A","B"];
+const SPACING = 14, STEP = 7, BOTTOM = 116;
+const CLEFS = {
+  // Inicial: 15 notas por clave. Avanzado: sol baja hasta C3 (debajo de C4), fa sube hasta G4.
+  sol: { bottomN: 4*7+2, from: 4*7+0, to: 6*7+0, advFrom: 3*7+0, advTo: 6*7+0 },
+  fa:  { bottomN: 2*7+4, from: 2*7+0, to: 4*7+0, advFrom: 2*7+0, advTo: 4*7+4 }
+};
+const PALETTE = ["#1e6fe0", "#14a34a", "#e5392b", "#f08a0c", "#8a3ffc", "#0fa3b1", "#d6336c"];
+const ACCENTS = ["#ffd23f", "#7ee2a8", "#ffa8a0", "#ffd08a", "#d4b8ff", "#8fe3ec", "#ffb3cf"];
+const CHEERS = ["¡Genial!", "¡Súper!", "¡Excelente!", "¡Crack!", "¡Muy bien!", "¡Nivel up!"];
+
+function buildDeck() {
+  const clefs = mode === "ambas" ? ["sol","fa"] : [mode];
+  const cards = [];
+  clefs.forEach(k => {
+    const c = CLEFS[k];
+    const lo = level === "avanzado" ? c.advFrom : c.from;
+    const hi = level === "avanzado" ? c.advTo : c.to;
+    for (let n = lo; n <= hi; n++) {
+      const oct = Math.floor(n / 7), li = n % 7;
+      cards.push({ clef: k, n, es: NAMES_ES[li], en: LETTERS[li], piano: LETTERS[li] + oct });
+    }
+  });
+  return cards;
+}
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function clefSvg(k) {
+  const s = 'fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"';
+  if (k === "sol") {
+    return `<g ${s}>
+      <path d="M54 134 C54 100 62 74 63 52 C64 36 53 34 52 46 C51 62 74 78 74 98 C74 114 54 120 45 108 C37 97 48 85 57 90 C65 95 63 105 55 106"/>
+      <path d="M54 134 L53 146 C52 154 43 153 44 146"/>
+    </g>`;
+  }
+  return `<path d="M44 72 C62 59 88 68 86 92 C84 108 66 119 38 127 C62 112 75 102 76 90 C77 76 62 70 48 79 Z" fill="currentColor"/>
+  <circle cx="47" cy="74" r="6.5" fill="currentColor"/>
+  <circle cx="98" cy="67" r="3.2" fill="currentColor"/>
+  <circle cx="98" cy="81" r="3.2" fill="currentColor"/>`;
+}
+
+function staffSvg(card) {
+  const c = CLEFS[card.clef];
+  const y = BOTTOM - (card.n - c.bottomN) * STEP;
+  const x = 185;
+  let out = `<svg viewBox="0 0 300 190" role="img" aria-label="${T().staffAlt}">`;
+  for (let i = 0; i < 5; i++) {
+    const ly = BOTTOM - i * SPACING;
+    out += `<line x1="24" y1="${ly}" x2="276" y2="${ly}" stroke="currentColor" stroke-width="1.8"/>`;
+  }
+  out += clefSvg(card.clef);
+  for (let ly = BOTTOM + SPACING; ly <= y + 3; ly += SPACING)
+    out += `<line x1="${x-17}" y1="${ly}" x2="${x+17}" y2="${ly}" stroke="currentColor" stroke-width="1.8"/>`;
+  for (let ly = BOTTOM - 4 * SPACING - SPACING; ly >= y - 3; ly -= SPACING)
+    out += `<line x1="${x-17}" y1="${ly}" x2="${x+17}" y2="${ly}" stroke="currentColor" stroke-width="1.8"/>`;
+  const up = y >= BOTTOM - 2 * SPACING;
+  out += up
+    ? `<line x1="${x+8.6}" y1="${y}" x2="${x+8.6}" y2="${y-46}" stroke="currentColor" stroke-width="2.4"/>`
+    : `<line x1="${x-8.6}" y1="${y}" x2="${x-8.6}" y2="${y+46}" stroke="currentColor" stroke-width="2.4"/>`;
+  out += `<ellipse cx="${x}" cy="${y}" rx="9.5" ry="6.6" transform="rotate(-20 ${x} ${y})" fill="currentColor"/>`;
+  return out + `</svg>`;
+}
+
+let mode = "sol", level = "inicial", deck = [], idx = 0, known = new Set(), flipped = false, cheer = -1, shown = 0, busy = false;
+
+function setPressed(sel, attr, val) {
+  document.querySelectorAll(sel).forEach(x => x.setAttribute("aria-pressed", x.dataset[attr] === val));
+}
+
+function start() {
+  deck = shuffle(buildDeck());
+  idx = 0; known = new Set(); flipped = false; cheer = -1; shown = 0; busy = false;
+  render();
+}
+
+function paint() {
+  const i = (shown + known.size) % PALETTE.length;
+  document.documentElement.style.setProperty("--bgc", PALETTE[i]);
+  return ACCENTS[i];
+}
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T()[el.dataset.i18n]; });
+  document.querySelectorAll(".seg button[data-lang]").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+}
+
+function render() {
+  const t = T();
+  const stage = document.getElementById("stage");
+  const pending = deck.filter(c => !known.has(c.clef + c.n));
+  document.getElementById("stats").textContent = t.stats(known.size, deck.length);
+  document.getElementById("fill").style.width = (deck.length ? known.size / deck.length * 100 : 0) + "%";
+
+  if (pending.length === 0) {
+    document.documentElement.style.setProperty("--bgc", "#14a34a");
+    const next = level === "inicial";
+    stage.innerHTML = `<div class="done"><h2>${t.doneTitle}</h2><p>${t.doneText(deck.length)}</p>
+      <div class="actions" style="margin-top:16px">
+        ${next ? `<button class="ok" id="nextlevel">${t.goL2}</button>` : ""}
+        <button class="plain" id="again">${t.again}</button>
+      </div></div>`;
+    document.getElementById("again").onclick = start;
+    if (next) document.getElementById("nextlevel").onclick = () => {
+      level = "avanzado"; setPressed(".seg button[data-level]", "level", level); start();
+    };
+    return;
+  }
+  if (idx >= pending.length) idx = 0;
+  const card = pending[idx];
+  const accent = paint();
+  const title = card.clef === "sol" ? t.titleSol : t.titleFa;
+  const svg = staffSvg(card);
+  const big = lang === "es" ? card.es : card.en;
+  const small = lang === "es" ? card.en : card.es;
+
+  stage.innerHTML = `
+  <div style="display:flex;flex-direction:column;align-items:center">
+  ${cheer >= 0 ? `<div class="cheer">${t.cheers[cheer]}</div>` : ""}
+  <div class="scene" id="scene">
+    <button class="card ${flipped ? "flipped" : ""}" id="card" aria-label="${t.flip}" style="--accent:${accent}">
+      <div class="face front">
+        <div class="title">${title}</div>${svg}
+        <div class="slot empty">${t.ask}</div>
+        <div class="piano">&nbsp;</div>
+      </div>
+      <div class="face back">
+        <div class="title">${title}</div>${svg}
+        <div class="slot"><div class="es">${big}</div><div class="en">${small}</div></div>
+        <div class="piano">${t.piano}: ${card.piano}</div>
+      </div>
+    </button>
+  </div>
+  <div class="actions" id="actions">${flipped ? actionBtns() : ""}</div>
+  <div class="nav"><button id="prev">${t.prev}</button><button id="next">${t.next}</button><button id="shuf">${t.shuf}</button></div>
+  </div>`;
+  cheer = -1;
+
+  document.getElementById("card").onclick = flip;
+  document.getElementById("prev").onclick = () => go(-1, pending.length);
+  document.getElementById("next").onclick = () => go(1, pending.length);
+  document.getElementById("shuf").onclick = () => { if (busy) return; deck = shuffle(deck); idx = 0; flipped = false; render(); };
+  if (flipped) bindActions(card, pending.length);
+}
+
+function actionBtns() {
+  const t = T();
+  return `<button class="redo" id="redo">${t.redo}</button><button class="ok" id="ok">${t.ok}</button>`;
+}
+
+function burst(scene) {
+  const r = scene.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const colors = ["#ffd23f", "#2bd36b", "#e5392b", "#1e6fe0", "#8a3ffc", "#ffb020", "#ffffff"];
+  const made = [];
+  for (let i = 0; i < 26; i++) {
+    const b = document.createElement("div");
+    b.className = "bit";
+    b.style.left = cx + "px"; b.style.top = cy + "px";
+    b.style.background = colors[i % colors.length];
+    b.style.setProperty("--dx", (Math.random() * 360 - 180) + "px");
+    b.style.setProperty("--dy", (Math.random() * -260 - 20) + "px");
+    b.style.setProperty("--rot", (Math.random() * 720 - 360) + "deg");
+    document.body.appendChild(b); made.push(b);
+  }
+  const star = document.createElement("div");
+  star.className = "bigstar"; star.textContent = "⭐";
+  star.style.left = cx + "px"; star.style.top = cy + "px";
+  document.body.appendChild(star); made.push(star);
+  setTimeout(() => made.forEach(el => el.remove()), 1100);
+}
+
+function bindActions(card, len) {
+  document.getElementById("ok").onclick = () => {
+    if (busy) return;
+    busy = true;
+    const finish = () => {
+      known.add(card.clef + card.n);
+      cheer = Math.floor(Math.random() * T().cheers.length);
+      flipped = false; busy = false; render();
+    };
+    if (reduceMotion()) { finish(); return; }
+    const scene = document.getElementById("scene");
+    scene.classList.add("pop");
+    burst(scene);
+    setTimeout(finish, 800);
+  };
+  document.getElementById("redo").onclick = () => { if (busy) return; shown++; go(1, len); };
+}
+
+function flip() {
+  if (busy) return;
+  flipped = !flipped;
+  document.getElementById("card").classList.toggle("flipped", flipped);
+  const pending = deck.filter(c => !known.has(c.clef + c.n));
+  const card = pending[idx];
+  document.getElementById("actions").innerHTML = flipped ? actionBtns() : "";
+  if (flipped) bindActions(card, pending.length);
+}
+
+function go(d, len) {
+  if (busy) return;
+  idx = (idx + d + len) % len;
+  shown++;
+  flipped = false;
+  render();
+}
+
+document.querySelectorAll(".seg button[data-clef]").forEach(b => {
+  b.onclick = () => { mode = b.dataset.clef; setPressed(".seg button[data-clef]", "clef", mode); start(); };
+});
+document.querySelectorAll(".seg button[data-level]").forEach(b => {
+  b.onclick = () => { level = b.dataset.level; setPressed(".seg button[data-level]", "level", level); start(); };
+});
+
+document.querySelectorAll(".seg button[data-lang]").forEach(b => {
+  b.onclick = () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem("notas-lang", lang); } catch (e) {}
+    applyLang(); render();
+  };
+});
+
+document.addEventListener("keydown", e => {
+  const pending = deck.filter(c => !known.has(c.clef + c.n));
+  if (!pending.length) return;
+  if (e.key === "ArrowRight") go(1, pending.length);
+  else if (e.key === "ArrowLeft") go(-1, pending.length);
+  else if (e.key === " " && document.activeElement.id !== "card") { e.preventDefault(); flip(); }
+});
+
+applyLang();
+start();
+</script>
+</body>
+</html>
