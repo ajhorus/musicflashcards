@@ -63,7 +63,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 3px; }
   padding: 6px 16px; margin-bottom: 10px; font-size: 1.1rem; box-shadow: 0 4px 0 rgba(0,0,0,.35);
 }
 
-.scene { width: min(300px, 86vw); aspect-ratio: 3 / 4; perspective: 1200px; }
+.scene { width: min(300px, 56vw); aspect-ratio: 3 / 4; perspective: 1200px; flex: none; }
 .card {
   position: relative; width: 100%; height: 100%;
   transform-style: preserve-3d; transition: transform .45s cubic-bezier(.3,.7,.2,1);
@@ -103,6 +103,22 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 3px; }
 .done h2 { margin: 0 0 6px; font-size: 1.5rem; }
 .done p { margin: 0; color: var(--muted); }
 .hint { background: var(--panel); color: var(--panel-ink); border-radius: 10px; padding: 6px 12px; font-size: .78rem; margin-top: 18px; text-align: center; max-width: 320px; }
+.play { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.choices { display: flex; flex-direction: column; gap: 14px; width: min(130px, 30vw); }
+.choice {
+  background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 14px 4px;
+  box-shadow: 0 5px 0 rgba(0,0,0,.4); display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.choice .big { font-size: 1.5rem; line-height: 1.1; }
+.choice .small { font-size: .8rem; color: var(--muted); }
+.choice:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.choice:disabled { cursor: default; }
+.choice.right { background: var(--green); }
+.choice.right .small { color: var(--ink); }
+.choice.wrong { background: #ff6b5e; animation: shake .4s; }
+.choice.wrong .small { color: var(--ink); }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+.cheer.try { background: var(--orange); }
 .scene.pop { animation: pop .7s ease; }
 @keyframes pop {
   0% { transform: scale(1) rotate(0); }
@@ -128,7 +144,7 @@ button:focus-visible { outline: 4px solid #fff; outline-offset: 3px; }
 .cheer { animation: cheerin .35s ease; }
 @keyframes cheerin { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .langbar { margin-bottom: 10px; }
-@media (prefers-reduced-motion: reduce) { .card, .bar > i, body { transition: none; } .scene.pop, .cheer { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .card, .bar > i, body { transition: none; } .scene.pop, .cheer, .choice.wrong { animation: none; } }
 </style>
 </head>
 <body>
@@ -166,12 +182,12 @@ const I18N = {
     welcome: "Bienvenido Rafael, estoy aquí para llevarte al siguiente nivel",
     l1: "Nivel 1: Inicial", l2: "Nivel 2: Avanzado",
     sol: "Clave de Sol", fa: "Clave de Fa", both: "Ambas",
-    hint: "Toca la tarjeta para voltearla. Flechas del teclado para moverte.",
+    hint: "Elige la nota correcta, o toca la tarjeta para ver la respuesta. Teclas 1, 2, 3 para elegir.",
     stats: (a, b) => `⭐ ${a} de ${b} notas`,
     titleSol: "CLAVE DE SOL", titleFa: "CLAVE DE FA",
     ask: "¿Qué nota es? 🤔", piano: "Piano",
     redo: "Repasar", ok: "¡La sabía!", prev: "Anterior", next: "Siguiente", shuf: "Mezclar",
-    flip: "Voltear tarjeta", staffAlt: "Nota en el pentagrama",
+    flip: "Voltear tarjeta", tryAgain: "¡Inténtalo otra vez!", staffAlt: "Nota en el pentagrama",
     doneTitle: "🏆 ¡Nivel completado!", doneText: n => `Reconociste las ${n} notas.`,
     goL2: "Ir al Nivel 2", again: "Jugar otra vez",
     cheers: ["¡Genial!", "¡Súper!", "¡Excelente!", "¡Crack!", "¡Muy bien!", "¡Nivel up!"]
@@ -181,12 +197,12 @@ const I18N = {
     welcome: "Welcome Rafael, I\u2019m here to take you to the next level",
     l1: "Level 1: Beginner", l2: "Level 2: Advanced",
     sol: "Treble clef", fa: "Bass clef", both: "Both",
-    hint: "Tap the card to flip it. Use the arrow keys to move.",
+    hint: "Pick the right note, or tap the card to see the answer. Keys 1, 2, 3 to choose.",
     stats: (a, b) => `⭐ ${a} of ${b} notes`,
     titleSol: "TREBLE CLEF", titleFa: "BASS CLEF",
     ask: "What note is it? 🤔", piano: "Piano",
     redo: "Review", ok: "I knew it!", prev: "Previous", next: "Next", shuf: "Shuffle",
-    flip: "Flip card", staffAlt: "Note on the staff",
+    flip: "Flip card", tryAgain: "Try again!", staffAlt: "Note on the staff",
     doneTitle: "🏆 Level complete!", doneText: n => `You recognized all ${n} notes.`,
     goL2: "Go to Level 2", again: "Play again",
     cheers: ["Awesome!", "Super!", "Excellent!", "Nailed it!", "Great job!", "Level up!"]
@@ -264,7 +280,7 @@ function staffSvg(card) {
   return out + `</svg>`;
 }
 
-let mode = "sol", level = "inicial", deck = [], idx = 0, known = new Set(), flipped = false, cheer = -1, shown = 0, busy = false;
+let mode = "sol", level = "inicial", deck = [], idx = 0, known = new Set(), flipped = false, cheer = -1, shown = 0, busy = false, curKey = "", choices = [], wrong = new Set();
 
 function setPressed(sel, attr, val) {
   document.querySelectorAll(sel).forEach(x => x.setAttribute("aria-pressed", x.dataset[attr] === val));
@@ -272,7 +288,7 @@ function setPressed(sel, attr, val) {
 
 function start() {
   deck = shuffle(buildDeck());
-  idx = 0; known = new Set(); flipped = false; cheer = -1; shown = 0; busy = false;
+  idx = 0; known = new Set(); flipped = false; cheer = -1; shown = 0; busy = false; curKey = "";
   render();
 }
 
@@ -316,10 +332,16 @@ function render() {
   const svg = staffSvg(card);
   const big = lang === "es" ? card.es : card.en;
   const small = lang === "es" ? card.en : card.es;
+  const key = card.clef + card.n, correctLi = card.n % 7;
+  if (key !== curKey) {
+    curKey = key; wrong = new Set();
+    choices = shuffle([correctLi, ...shuffle([0,1,2,3,4,5,6].filter(x => x !== correctLi)).slice(0, 2)]);
+  }
 
   stage.innerHTML = `
   <div style="display:flex;flex-direction:column;align-items:center">
-  ${cheer >= 0 ? `<div class="cheer">${t.cheers[cheer]}</div>` : ""}
+  <div class="cheer" id="cheerbox" ${cheer >= 0 ? "" : "hidden"}>${cheer >= 0 ? t.cheers[cheer] : ""}</div>
+  <div class="play">
   <div class="scene" id="scene">
     <button class="card ${flipped ? "flipped" : ""}" id="card" aria-label="${t.flip}" style="--accent:${accent}">
       <div class="face front">
@@ -334,12 +356,15 @@ function render() {
       </div>
     </button>
   </div>
+  <div class="choices" id="choices">${choices.map(li => `<button class="choice ${wrong.has(li) ? "wrong" : ""}" data-li="${li}" ${wrong.has(li) || flipped ? "disabled" : ""}><span class="big">${lang === "es" ? NAMES_ES[li] : LETTERS[li]}</span><span class="small">${lang === "es" ? LETTERS[li] : NAMES_ES[li]}</span></button>`).join("")}</div>
+  </div>
   <div class="actions" id="actions">${flipped ? actionBtns() : ""}</div>
   <div class="nav"><button id="prev">${t.prev}</button><button id="next">${t.next}</button><button id="shuf">${t.shuf}</button></div>
   </div>`;
   cheer = -1;
 
   document.getElementById("card").onclick = flip;
+  document.querySelectorAll(".choice").forEach(b => { b.onclick = () => choose(+b.dataset.li, card); });
   document.getElementById("prev").onclick = () => go(-1, pending.length);
   document.getElementById("next").onclick = () => go(1, pending.length);
   document.getElementById("shuf").onclick = () => { if (busy) return; deck = shuffle(deck); idx = 0; flipped = false; render(); };
@@ -391,10 +416,37 @@ function bindActions(card, len) {
   document.getElementById("redo").onclick = () => { if (busy) return; shown++; go(1, len); };
 }
 
+function choose(li, card) {
+  if (busy || flipped) return;
+  const btn = document.querySelector(`.choice[data-li="${li}"]`);
+  if (li !== card.n % 7) {
+    wrong.add(li);
+    btn.classList.add("wrong"); btn.disabled = true;
+    const box = document.getElementById("cheerbox");
+    box.textContent = T().tryAgain; box.classList.add("try"); box.hidden = false;
+    return;
+  }
+  busy = true;
+  btn.classList.add("right");
+  document.getElementById("card").classList.add("flipped");
+  document.querySelectorAll(".choice").forEach(b => { b.disabled = true; });
+  const finish = () => {
+    known.add(card.clef + card.n);
+    cheer = Math.floor(Math.random() * T().cheers.length);
+    flipped = false; busy = false; render();
+  };
+  if (reduceMotion()) { setTimeout(finish, 700); return; }
+  const scene = document.getElementById("scene");
+  scene.classList.add("pop");
+  burst(scene);
+  setTimeout(finish, 1000);
+}
+
 function flip() {
   if (busy) return;
   flipped = !flipped;
   document.getElementById("card").classList.toggle("flipped", flipped);
+  document.querySelectorAll(".choice").forEach(b => { b.disabled = flipped || wrong.has(+b.dataset.li); });
   const pending = deck.filter(c => !known.has(c.clef + c.n));
   const card = pending[idx];
   document.getElementById("actions").innerHTML = flipped ? actionBtns() : "";
@@ -429,6 +481,10 @@ document.addEventListener("keydown", e => {
   if (!pending.length) return;
   if (e.key === "ArrowRight") go(1, pending.length);
   else if (e.key === "ArrowLeft") go(-1, pending.length);
+  else if (["1","2","3"].includes(e.key) && !flipped && !busy) {
+    const b = document.querySelectorAll(".choice")[+e.key - 1];
+    if (b && !b.disabled) b.click();
+  }
   else if (e.key === " " && document.activeElement.id !== "card") { e.preventDefault(); flip(); }
 });
 
